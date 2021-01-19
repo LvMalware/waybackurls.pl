@@ -46,11 +46,11 @@ user@host:~$ waybackurls.pl -M text/html,image/jpeg,text/css targetsite.com --js
 
 Distributed under the GNU GPL license. See ``LICENSE`` for more information.
 
-[GitHub Repository](https://github.com/LvMalware/waybackmachine.pl)
+[GitHub Repository](https://github.com/LvMalware/waybackurls.pl)
 
 ## Contributing
 
-1. Fork it (<https://github.com/LvMalware/waybackmachine.pl/fork>)
+1. Fork it (<https://github.com/LvMalware/waybackurls.pl/fork>)
 2. Create your feature branch (`git checkout -b feature/fooBar`)
 3. Commit your changes (`git commit -am 'Add some fooBar'`)
 4. Push to the branch (`git push origin feature/fooBar`)
