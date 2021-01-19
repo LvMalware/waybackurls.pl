@@ -21,9 +21,16 @@ sub request
 
 sub wayback_urls
 {
-    my ($domain, $subs) = @_;
-    my $sub_dmns = $subs ? "*." : "";
-    my $str_json = request("http://web.archive.org/cdx/search/cdx?url=${sub_dmns}${domain}/*&output=json&collapse=urlkey");
+    my ($domain, $subs, $bad_mime, $good_mime, $bad_status, $good_status) = @_;
+    my $api_url  = "http://web.archive.org/cdx/search/cdx?url=";
+    $api_url .= "*." if $subs;
+    $api_url .= "$domain/*&output=json&collapse=urlkey";
+    $api_url .= "&filter=!statuscode:$bad_status" if $bad_status;
+    $api_url .= "&filter=statuscode:$good_status" if $good_status;
+    $api_url .= "&filter=!mimetype:$bad_mime"     if $bad_mime;
+    $api_url .= "&filter=mimetype:$good_mime"     if $good_mime;
+    
+    my $str_json = request($api_url);
     $str_json ? decode_json($str_json) : [];
 }
 
@@ -36,21 +43,13 @@ sub get_ext
 
 sub filter_urls
 {
-    my (
-        $urls, $include_ext, $exclude_ext, $include_type,
-        $exclude_type, $include_code, $exclude_code,
-    ) = @_;
+    my ($urls, $include_ext, $exclude_ext) = @_;
 
     my $url_count = 0;
 
     my @bad_exts  = split /,/, $exclude_ext;
-    my @bad_type  = split /,/, $exclude_type;
-    my @bad_code  = split /,/, $exclude_code;
-
     my @good_exts = split /,/, $include_ext;
-    my @good_type = split /,/, $include_type;
-    my @good_code = split /,/, $include_code;
-
+    
     for my $info (@{$urls})
     {
         my ($key, $time, $url, $type, $status, $digest, $length) = @{$info};
@@ -60,13 +59,8 @@ sub filter_urls
         my $uri = URI::URL->new($url);
         my $ext = get_ext($uri->epath);
         
-        next if @good_code && !grep(/^$status$/i, @good_code);
         next if @good_exts && !grep(/^$ext$/i, @good_exts);
-        next if @good_type && !grep(/$type/i, @good_type);
-        
-        next if @bad_code && grep(/^$status$/i, @bad_code);
         next if @bad_exts && grep(/^$ext$/i, @bad_exts);
-        next if @bad_type && grep(/$type/i, @bad_type);
 
         $url_count ++;
 
@@ -76,6 +70,7 @@ sub filter_urls
                 {
                     url         => $url,
                     timestamp   => $time,
+                    mimetype    => $type,
                     status      => $status,
                     length      => $length,
                 }
@@ -138,10 +133,9 @@ sub version
 
 sub main
 {
-    my ($good_extensions, $bad_extensions) = ("", "");
-    my ($good_types, $bad_types, $good_status, $bad_status) = ("", "", "", "");
+    my (@good_extensions, @bad_extensions, @targets);
+    my (@good_types, @bad_types, @good_status, @bad_status);
     my ($subdomains, $input_file, $output_file) = (1, "", "");
-    my @targets;
 
     help unless @ARGV;
 
@@ -150,15 +144,15 @@ sub main
         "v|version"         => \&version,
         "s|silent"          => sub { $silent = 1 },
         "j|json"            => \$json,
-        "e|extensions=s"    => \$good_extensions,
-        "m|mime-types=s"    => \$good_types,
-        "c|status-codes=s"  => \$good_status,
+        "e|extensions=s"    => \@good_extensions,
+        "m|mime-types=s"    => \@good_types,
+        "c|status-codes=s"  => \@good_status,
         "i|input-file=s"    => \$input_file,
         "d|subdomains!"     => \$subdomains,
         "o|output-file=s"   => \$output_file,
-        "E|exclude-exts=s"  => \$bad_extensions,
-        "M|exclude-types=s" => \$bad_types,
-        "C|exclude-codes=s" => \$bad_status,
+        "E|exclude-exts=s"  => \@bad_extensions,
+        "M|exclude-types=s" => \@bad_types,
+        "C|exclude-codes=s" => \@bad_status,
     ) || help();
 
     push @targets, @ARGV if @ARGV;
@@ -178,8 +172,8 @@ sub main
         until (eof($input))
         {
             chomp(my $domain = <$input>);
-            push @targets, $domain;
-        } 
+            push @targets, $domain if $domain;
+        }
     }
     
     die "No targets" unless @targets;
@@ -194,16 +188,23 @@ sub main
         }
     }
 
+    my $exclude_exts = join ',', @bad_extensions;
+    my $include_exts = join ',', @good_extensions;
+    my $exclude_mime = join '|', map { $_ =~ s/,/\|/gr } @bad_types;
+    my $include_mime = join '|', map { $_ =~ s/,/\|/gr } @good_types;
+    my $exclude_code = join '|', map { $_ =~ s/,/\|/gr } @bad_status;
+    my $include_code = join '|', map { $_ =~ s/,/\|/gr } @good_status;
+
     for my $domain (@targets)
     {
         print STDERR "[+] Searching urls for $domain ...\n" unless $silent;
-        my $raw_urls = wayback_urls($domain, $subdomains);
-        my $count    = 0 + @{$raw_urls};
-        print STDERR "[+] Got $count urls. Filtering ...\n" unless $silent;
-        my $total = filter_urls(
-            $raw_urls, $good_extensions, $bad_extensions,
-            $good_types, $bad_types, $good_status, $bad_status
+        my $raw_urls = wayback_urls(
+            $domain, $subdomains, $exclude_mime,
+            $include_mime, $exclude_code, $include_code
         );
+        my $count = 0 + @{$raw_urls};
+        print STDERR "[+] Got $count urls. Filtering ...\n" unless $silent;
+        my $total = filter_urls($raw_urls, $include_exts, $exclude_exts);
         print STDERR "[+] Found $total valid urls.\n" unless $silent;
     }
 
