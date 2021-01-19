@@ -88,7 +88,7 @@ sub filter_urls
 
 sub help
 {
-    my ($resumed) = @_;
+    my ($full) = @_;
     
     my $prog = basename($0);
 
@@ -116,18 +116,30 @@ Options:
 
 HELP
 
-    return if $resumed;
+    exit unless $full;
     
     print <<NOTES;
 
-NOTES
+Examples:
 
+    $prog -o output.txt -E css,jpg,jpeg,js,pdf,doc,docx -C 404 targetsite.com
+    $prog --no-subdomains -e php,txt,bkp -c 200 --json -i targets.txt
+    $prog -o output.txt -C 404,403,500 -i - < targets.txt
+    $prog -M text/html,image/jpeg,text/css targetsite.com --json > output.txt
+
+Author:
+
+    Lucas V. Araujo <lucas.vieira.ar\@disroot.org>
+    GitHub: https://github.com/LvMalware/waybackurls.pl
+    
+    This tool is based on https://github.com/original
+NOTES
     exit 0;
 }
 
 sub version
 {
-    print "v0.1-BETA\n";
+    print "v0.1.1-BETA\n";
     exit 0;
 }
 
@@ -135,7 +147,7 @@ sub main
 {
     my (@good_extensions, @bad_extensions, @targets);
     my (@good_types, @bad_types, @good_status, @bad_status);
-    my ($subdomains, $input_file, $output_file) = (1, "", "");
+    my ($subdomains, $infile, $outfile) = (1, "", "");
 
     help unless @ARGV;
 
@@ -147,26 +159,26 @@ sub main
         "e|extensions=s"    => \@good_extensions,
         "m|mime-types=s"    => \@good_types,
         "c|status-codes=s"  => \@good_status,
-        "i|input-file=s"    => \$input_file,
+        "i|input-file=s"    => \$infile,
         "d|subdomains!"     => \$subdomains,
-        "o|output-file=s"   => \$output_file,
+        "o|output-file=s"   => \$outfile,
         "E|exclude-exts=s"  => \@bad_extensions,
         "M|exclude-types=s" => \@bad_types,
         "C|exclude-codes=s" => \@bad_status,
     ) || help();
 
     push @targets, @ARGV if @ARGV;
-    if ($input_file)
+    if ($infile)
     {
         my $input;
-        if ($input_file eq "-")
+        if ($infile eq "-")
         {
             open($input, "<&=STDIN");
         }
         else
         {
-            open($input, "<$input_file") ||
-                die "$0: Can't open $input_file: $!";
+            open($input, "<$infile") ||
+                die "$0: Can't open $infile: $!";
         }
 
         until (eof($input))
@@ -179,13 +191,10 @@ sub main
     die "No targets" unless @targets;
     
     open($output, ">&STDOUT");
-    if ($output_file)
+    
+    if ($outfile && $outfile ne "-")
     {
-        if ($output_file ne "-")
-        {
-            open($output, ">$output_file") ||
-                die "$0: Can't open $output_file: $!";
-        }
+        open($output, ">$outfile") || die "$0: Can't open $outfile: $!";
     }
 
     my $exclude_exts = join ',', @bad_extensions;
