@@ -38,7 +38,8 @@ sub get_ext
 {
     my ($path) = @_;
     my $file = basename($path);
-    ($file =~ /\./) ? (split /\./, $file)[-1] : '.'
+    my $ext = ($file =~ /\./) ? (split /\./, $file)[-1] : '.';
+    ($ext =~ /\?/) ? (split /\?/, $ext)[0] : $ext
 }
 
 sub filter_urls
@@ -57,7 +58,7 @@ sub filter_urls
         next if $url eq 'original';
         
         my $uri = URI::URL->new($url);
-        my $ext = get_ext($uri->epath);
+        my $ext = quotemeta get_ext($uri->epath);
         
         next if @good_exts && !grep(/^$ext$/i, @good_exts);
         next if @bad_exts && grep(/^$ext$/i, @bad_exts);
