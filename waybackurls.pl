@@ -34,6 +34,36 @@ sub wayback_urls
     $str_json ? decode_json($str_json) : [];
 }
 
+sub alienvault_urls
+{
+    my ($domain, $subs, $bad_mime, $good_mime, $bad_status, $good_status) = @_;
+    my $api_url  = "https://otx.alienvault.com/api/v1/indicators/";
+    $api_url .= $subs ? "domain" : "hostname";
+    my $next = 1;
+    my $page = 0;
+    my $urls_list = [];
+    my @good_codes = split /,/, $good_status;
+    my @bad_codes  = split /,/, $bad_status;
+    while ($next)
+    {
+        my $str_json = request("$api_url/$domain/url_list?page=$page");
+        my $json = $str_json ? decode_json($str_json) : last;
+        $next = $json->{has_next} eq 'true';
+        for my $entry (@{$json->{urls_list}})
+        {
+            my $status = $entry->{httpcode};
+            next unless $status;
+            next if @bad_codes && grep(/^$status$/, @bad_codes);
+            next if @good_codes && !grep(/^$status$/, @good_codes);
+            push @{$urls_list}, [
+                "-", $entry->{date}, $entry->{url}, '?', $status, '-', 'unknown'
+            ]
+        }
+        $page ++;
+    }
+    $urls_list
+}
+
 sub get_ext
 {
     my ($path) = @_;
@@ -214,13 +244,20 @@ sub main
     for my $domain (@targets)
     {
         print STDERR "[+] Searching urls for $domain ...\n" unless $silent;
+        print STDERR "[+] Searching the Wayback Machine ...\n" unless $silent;
         my $raw_urls = wayback_urls(
             $domain, $subdomains, $exclude_mime,
             $include_mime, $exclude_code, $include_code
         );
-        my $count = 0 + @{$raw_urls};
+        print STDERR "[+] Searching the AlienVault ...\n" unless $silent;
+        my $otx_urls = alienvault_urls(
+            $domain, $subdomains, $exclude_mime,
+            $include_mime, $exclude_code, $include_code
+        );
+        my $count = @{$raw_urls} + @{$otx_urls};
         print STDERR "[+] Got $count urls. Filtering ...\n" unless $silent;
         my $total = filter_urls($raw_urls, $include_exts, $exclude_exts);
+        $total   += filter_urls($otx_urls, $include_exts, $exclude_exts);
         print STDERR "[+] Found $total valid urls.\n" unless $silent;
     }
 
