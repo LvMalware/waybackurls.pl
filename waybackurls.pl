@@ -37,9 +37,9 @@ sub wayback_urls
 sub get_ext
 {
     my ($path) = @_;
-    my $file = basename($path);
-    my $ext = ($file =~ /\./) ? (split /\./, $file)[-1] : '.';
-    ($ext =~ /\?/) ? (split /\?/, $ext)[0] : $ext
+    return '.' unless $path;
+    my $file = (split /\//, (split /\?|#/, $path)[0])[-1];
+    $file ? ((split /\./, $file)[-1] || '.') : '.';
 }
 
 sub filter_urls
@@ -50,7 +50,7 @@ sub filter_urls
 
     my @bad_exts  = split /,/, $exclude_ext;
     my @good_exts = split /,/, $include_ext;
-    
+
     for my $info (@{$urls})
     {
         my ($key, $time, $url, $type, $status, $digest, $length) = @{$info};
@@ -108,12 +108,14 @@ Options:
     -m, --mime-types        Comma-separated list of mime-types to filter by
     -c, --status-codes      Comma-separated list of status codes to filter by
     -i, --input-file        Read list of domains from file
-    -d, --subdomains        Also search for subdomain urls (Default)
+    -d, --subdomains        Also search for subdomain urls (default)
     -o, --output-file       Save output to a file, don't print to stdout
     -E, --exclude-exts      Comma-separated list of extensions to be ignored
     -M, --exclude-types     Comma-separated list of mime-types to be ignored
     -C, --exclude-codes     Comma-separated list of status codes to be ignored
+    -g, --images            Include image links
     --no-subdomains         Don't search for subdomain urls
+    --no-images             Don't include image links (default)
 
 HELP
 
@@ -123,7 +125,7 @@ HELP
 
 Examples:
 
-    $prog -o output.txt -E css,jpg,jpeg,js,pdf,doc,docx -C 404 targetsite.com
+    $prog -o output.txt -E css,js,pdf,doc,docx -C 404 targetsite.com
     $prog --no-subdomains -e php,txt,bkp -c 200 --json -i targets.txt
     $prog -o output.txt -C 404,403,500 -i - < targets.txt
     $prog -M text/html,image/jpeg,text/css targetsite.com --json > output.txt
@@ -148,8 +150,9 @@ sub main
 {
     my (@good_extensions, @bad_extensions, @targets);
     my (@good_types, @bad_types, @good_status, @bad_status);
-    my ($subdomains, $infile, $outfile) = (1, "", "");
-
+    my ($subdomains, $infile, $outfile, $images) = (1, "", "", 0);
+    my $img_extensions = "svg,jpg,jpeg,png,gif,ico,bmp,webp";
+    
     help unless @ARGV;
 
     GetOptions(
@@ -166,6 +169,7 @@ sub main
         "E|exclude-exts=s"  => \@bad_extensions,
         "M|exclude-types=s" => \@bad_types,
         "C|exclude-codes=s" => \@bad_status,
+        "g|images!"         => \$images,
     ) || help();
 
     push @targets, @ARGV if @ARGV;
@@ -204,6 +208,8 @@ sub main
     my $include_mime = join '|', map { $_ =~ s/,/\|/gr } @good_types;
     my $exclude_code = join '|', map { $_ =~ s/,/\|/gr } @bad_status;
     my $include_code = join '|', map { $_ =~ s/,/\|/gr } @good_status;
+
+    $exclude_exts .= "," . $img_extensions unless $images;
 
     for my $domain (@targets)
     {
