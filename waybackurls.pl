@@ -107,7 +107,7 @@ NOTES
 
 sub version
 {
-    print "v0.1.1-BETA\n";
+    print "v0.1.2\n";
     exit 0;
 }
 
