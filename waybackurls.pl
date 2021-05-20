@@ -116,7 +116,7 @@ sub load_credentials
     my ($file) = @_;
     return {} unless $file;
     open(my $fh, "<$file") || die "$0: Can't open $file for reading: $!";
-    decode_json(join '', <$file>);
+    decode_json(join '', <$fh>);
 }
 
 sub main
