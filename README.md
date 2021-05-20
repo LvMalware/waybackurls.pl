@@ -22,12 +22,15 @@ Options:
     -m, --mime-types        Comma-separated list of mime-types to filter by
     -c, --status-codes      Comma-separated list of status codes to filter by
     -i, --input-file        Read list of domains from file
-    -d, --subdomains        Also search for subdomain urls (Default)
+    -d, --subdomains        Also search for subdomain urls (default)
     -o, --output-file       Save output to a file, don't print to stdout
     -E, --exclude-exts      Comma-separated list of extensions to be ignored
     -M, --exclude-types     Comma-separated list of mime-types to be ignored
     -C, --exclude-codes     Comma-separated list of status codes to be ignored
+    -g, --images            Include image links
+    -k, --credentials       JSON file with credentials/API keys for sources
     --no-subdomains         Don't search for subdomain urls
+    --no-images             Don't include image links (default)
 ```
 
 ## Examples
