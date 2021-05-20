@@ -1,120 +1,54 @@
 #!/usr/bin/env perl
 
-use utf8;
 use JSON;
 use strict;
 use warnings;
-use URI::URL;
-use HTTP::Tiny;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case);
+use lib './lib';
+use Sources::WebArchive;
+use Sources::AlienVault;
+use Sources::IntelligenceX;
 
 my ($output, $silent, $json);
 
-sub request
-{
-    my ($url) = @_;
-    my $http = HTTP::Tiny->new();
-    my $resp = $http->get($url);
-    $resp->{success} ? $resp->{content} : ""
-}
+my @sources = qw(Sources::WebArchive Sources::AlienVault Sources::IntelligenceX);
 
-sub wayback_urls
+sub search_urls
 {
-    my ($domain, $subs, $bad_mime, $good_mime, $bad_status, $good_status) = @_;
-    my $api_url  = "http://web.archive.org/cdx/search/cdx?url=";
-    $api_url .= "*." if $subs;
-    $api_url .= "$domain/*&output=json&collapse=urlkey";
-    $api_url .= "&filter=!statuscode:$bad_status" if $bad_status;
-    $api_url .= "&filter=statuscode:$good_status" if $good_status;
-    $api_url .= "&filter=!mimetype:$bad_mime"     if $bad_mime;
-    $api_url .= "&filter=mimetype:$good_mime"     if $good_mime;
-    
-    my $str_json = request($api_url);
-    $str_json ? decode_json($str_json) : [];
-}
-
-sub alienvault_urls
-{
-    my ($domain, $subs, $bad_mime, $good_mime, $bad_status, $good_status) = @_;
-    my $api_url  = "https://otx.alienvault.com/api/v1/indicators/";
-    $api_url .= $subs ? "domain" : "hostname";
-    my $next = 1;
-    my $page = 0;
-    my $urls_list = [];
-    my @good_codes = split /,/, $good_status;
-    my @bad_codes  = split /,/, $bad_status;
-    while ($next)
+    my ($domain, $subdomains, $exclude_mime, $include_mime, $exclude_code,
+        $include_code, $exclude_exts, $include_exts, $credentials) = @_;
+    my $count = 0;
+    for my $source (@sources)
     {
-        my $str_json = request("$api_url/$domain/url_list?page=$page");
-        my $json = $str_json ? decode_json($str_json) : last;
-        $next = $json->{has_next} eq 'true';
-        for my $entry (@{$json->{urls_list}})
+        my $name = (split /:/, $source)[-1];
+        print STDERR "[+] Searching with $name ...\n" unless $silent;
+        my $searcher = $source->new(
+            filters => [
+                include_mime => $include_mime,
+                exclude_mime => $exclude_mime,
+                include_exts => $include_exts,
+                exclude_exts => $exclude_exts,
+                include_code => $include_code,
+                exclude_code => $exclude_code,
+            ],
+            subdomains => $subdomains,
+            credentials => $credentials->{$name},
+        );
+        
+        my $next = eval { $searcher->get_urls($domain) };
+        unless (defined($next))
         {
-            my $status = $entry->{httpcode};
-            next unless $status;
-            next if @bad_codes && grep(/^$status$/, @bad_codes);
-            next if @good_codes && !grep(/^$status$/, @good_codes);
-            push @{$urls_list}, [
-                "-", $entry->{date}, $entry->{url}, '?', $status, '-', 'unknown'
-            ]
+            print STDERR "[-] Failed: $@\n" unless $silent;
+            next
         }
-        $page ++;
-    }
-    $urls_list
-}
-
-sub get_ext
-{
-    my ($path) = @_;
-    return '.' unless $path;
-    my $file = (split /\//, (split /\?|#/, $path)[0])[-1];
-    $file ? ((split /\./, $file)[-1] || '.') : '.';
-}
-
-sub filter_urls
-{
-    my ($urls, $include_ext, $exclude_ext) = @_;
-
-    my $url_count = 0;
-
-    my @bad_exts  = split /,/, $exclude_ext;
-    my @good_exts = split /,/, $include_ext;
-
-    for my $info (@{$urls})
-    {
-        my ($key, $time, $url, $type, $status, $digest, $length) = @{$info};
-        
-        next if $url eq 'original';
-        
-        my $uri = URI::URL->new($url);
-        my $ext = quotemeta get_ext($uri->epath);
-        
-        next if @good_exts && !grep(/^$ext$/i, @good_exts);
-        next if @bad_exts && grep(/^$ext$/i, @bad_exts);
-
-        $url_count ++;
-
-        if ($json)
+        while (defined(my $entry = $next->()))
         {
-            my $encoded = encode_json(
-                {
-                    url         => $url,
-                    timestamp   => $time,
-                    mimetype    => $type,
-                    status      => $status,
-                    length      => $length,
-                }
-            );
-            print $output $encoded . "\n";
-        }
-        else
-        {
-            print $output $url . "\n";
+            print $output ($json ? encode_json($entry) : $entry->{url}), "\n";
+            $count ++;
         }
     }
-
-    $url_count;
+    $count;
 }
 
 sub help
@@ -144,6 +78,7 @@ Options:
     -M, --exclude-types     Comma-separated list of mime-types to be ignored
     -C, --exclude-codes     Comma-separated list of status codes to be ignored
     -g, --images            Include image links
+    -k, --credentials       JSON file with credentials/API keys for sources
     --no-subdomains         Don't search for subdomain urls
     --no-images             Don't include image links (default)
 
@@ -176,13 +111,22 @@ sub version
     exit 0;
 }
 
+sub load_credentials
+{
+    my ($file) = @_;
+    return {} unless $file;
+    open(my $fh, "<$file") || die "$0: Can't open $file for reading: $!";
+    decode_json(join '', <$file>);
+}
+
 sub main
 {
     my (@good_extensions, @bad_extensions, @targets);
     my (@good_types, @bad_types, @good_status, @bad_status);
     my ($subdomains, $infile, $outfile, $images) = (1, "", "", 0);
     my $img_extensions = "svg,jpg,jpeg,png,gif,ico,bmp,webp";
-    
+    my $creds_file;
+
     help unless @ARGV;
 
     GetOptions(
@@ -200,9 +144,11 @@ sub main
         "M|exclude-types=s" => \@bad_types,
         "C|exclude-codes=s" => \@bad_status,
         "g|images!"         => \$images,
+        "k|credentials=s"   => \$creds_file,
     ) || help();
 
     push @targets, @ARGV if @ARGV;
+
     if ($infile)
     {
         my $input;
@@ -244,20 +190,11 @@ sub main
     for my $domain (@targets)
     {
         print STDERR "[+] Searching urls for $domain ...\n" unless $silent;
-        print STDERR "[+] Searching the Wayback Machine ...\n" unless $silent;
-        my $raw_urls = wayback_urls(
+        my $total = search_urls(
             $domain, $subdomains, $exclude_mime,
-            $include_mime, $exclude_code, $include_code
+            $include_mime, $exclude_code, $include_code,
+            $exclude_exts, $include_exts, load_credentials($creds_file)
         );
-        print STDERR "[+] Searching the AlienVault ...\n" unless $silent;
-        my $otx_urls = alienvault_urls(
-            $domain, $subdomains, $exclude_mime,
-            $include_mime, $exclude_code, $include_code
-        );
-        my $count = @{$raw_urls} + @{$otx_urls};
-        print STDERR "[+] Got $count urls. Filtering ...\n" unless $silent;
-        my $total = filter_urls($raw_urls, $include_exts, $exclude_exts);
-        $total   += filter_urls($otx_urls, $include_exts, $exclude_exts);
         print STDERR "[+] Found $total valid urls.\n" unless $silent;
     }
 
