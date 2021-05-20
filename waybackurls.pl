@@ -24,14 +24,12 @@ sub search_urls
         my $name = (split /:/, $source)[-1];
         print STDERR "[+] Searching with $name ...\n" unless $silent;
         my $searcher = $source->new(
-            filters => [
-                include_mime => $include_mime,
-                exclude_mime => $exclude_mime,
-                include_exts => $include_exts,
-                exclude_exts => $exclude_exts,
-                include_code => $include_code,
-                exclude_code => $exclude_code,
-            ],
+            include_mime => $include_mime,
+            exclude_mime => $exclude_mime,
+            include_exts => $include_exts,
+            exclude_exts => $exclude_exts,
+            include_code => $include_code,
+            exclude_code => $exclude_code,
             subdomains => $subdomains,
             credentials => $credentials->{$name},
         );
@@ -186,7 +184,6 @@ sub main
     my $include_code = join '|', map { $_ =~ s/,/\|/gr } @good_status;
 
     $exclude_exts .= "," . $img_extensions unless $images;
-
     for my $domain (@targets)
     {
         print STDERR "[+] Searching urls for $domain ...\n" unless $silent;

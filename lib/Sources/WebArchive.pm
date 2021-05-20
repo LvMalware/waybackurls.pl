@@ -35,14 +35,14 @@ sub get_urls
     $api_url .= "&filter=!statuscode:$filters->{exclude_code}" if $filters->{exclude_code};
     my $response = HTTP::Tiny->new()->get($api_url);
     return {} unless $response->{success};
-    return $self->__filter(decode_json($response->{content}), $filters, $limit);
+    return $self->__filter(decode_json($response->{content}), $limit);
 }
 
 sub __filter
 {
-    my ($self, $json, $filters, $limit) = @_;
-    my @include = split /,/, $filters->{include_exts} || "";
-    my @exclude = split /,/, $filters->{exclude_exts} || "";
+    my ($self, $json, $limit) = @_;
+    my @include = split /,/, $self->{filters}->{include_exts} || "";
+    my @exclude = split /,/, $self->{filters}->{exclude_exts} || "";
     my ($current, $max) = (0, $limit || @{$json} + 0);
     my @keys = qw(key timestamp url mimetype status digest length);
     return sub {
