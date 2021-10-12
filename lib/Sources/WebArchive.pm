@@ -51,7 +51,7 @@ sub __filter
             my $val = $json->[$i];
             my $url = $val->[2];
             my $ext = quotemeta(Sources::Utils::get_extension($url));
-            next if grep(/^$ext$/, @exclude) || (@include > 0 && !grep(/^$ext$/, @include));
+            next if grep(/^$ext$/i, @exclude) || (@include > 0 && !grep(/^$ext$/, @include));
             $current = $i + 1;
             return { map { $keys[$_] => $val->[$_] } 0 .. @keys - 1 }
         }

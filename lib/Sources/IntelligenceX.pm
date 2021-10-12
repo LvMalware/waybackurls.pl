@@ -68,7 +68,7 @@ sub __filter
             my $entry = $current->[$index ++];
             my $url = $entry->{selectorvalue};
             my $ext = quotemeta(Sources::Utils::get_extension($url));
-            next if grep(/^$ext$/, @exclude) || (@include > 0 && !grep(/^$ext$/, @include));
+            next if grep(/^$ext$/i, @exclude) || (@include > 0 && !grep(/^$ext$/, @include));
             my $host = URI::URL->new($url)->host;
             next if !($self->{subdomains}) && $host ne $domain;
             return { url => $url }

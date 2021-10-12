@@ -42,7 +42,7 @@ sub search_urls
         }
         while (defined(my $entry = $next->()))
         {
-            print $output ($json ? encode_json($entry) : $entry->{url}), "\n";
+            print $output ($json ? encode_json($entry) : $entry->{url} || next), "\n";
             $count ++;
         }
     }

@@ -65,7 +65,7 @@ sub __filter
             next if grep(/^$code$/, @exclude_code) || (@include_code > 0 && !grep(/^$code$/, @include_code));
             my $url = $entry->{url};
             my $ext = quotemeta(Sources::Utils::get_extension($url));
-            next if grep(/^$ext$/, @exclude_exts) || (@include_exts > 0 && !grep(/^$ext$/, @include_exts));
+            next if grep(/^$ext$/i, @exclude_exts) || (@include_exts > 0 && !grep(/^$ext$/, @include_exts));
             $count ++;
             return { timestamp => $entry->{date}, url => $url, status => $code }
         }
