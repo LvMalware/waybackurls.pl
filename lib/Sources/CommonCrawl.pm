@@ -41,21 +41,17 @@ sub __indexes {
     my ($self, $list, $query) = @_;
     my $http = HTTP::Tiny->new();
     my $index = 0;
-    return sub {
-        return "" if $index > $#$list;
-        my $entry = $list->[$index ++];
-        $http->get($entry->{'cdx-api'} . $query)->{content};
-    }
+    my $entry = $list->[$index ++];
+    $http->get($entry->{'cdx-api'} . $query)->{content};
 }
 
-sub __filter
-{
+sub __filter {
     my ($self, $next, $limit) = @_;
     my @include = split /,/, $self->{filters}->{include_exts} || "";
     my @exclude = split /,/, $self->{filters}->{exclude_exts} || "";
     my @keys = qw(key timestamp url mimetype status digest length);
     my $current = 0;
-    my $crawled = $next->();
+    my $crawled = $next;
     return sub {
         return undef unless $crawled;
         my $end = index($crawled, "\n", $current);
@@ -70,7 +66,7 @@ sub __filter
             return $cur
         }
         if ($end == -1) {
-            $crawled = $next->();
+            $crawled = undef;
             $current = 0;
         }
     }

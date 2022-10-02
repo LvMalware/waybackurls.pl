@@ -8,11 +8,12 @@ use Getopt::Long qw(:config no_ignore_case);
 use lib './lib';
 use Sources::WebArchive;
 use Sources::AlienVault;
+use Sources::CommonCrawl;
 use Sources::IntelligenceX;
 
 my ($output, $silent, $json);
 
-my @sources = qw(Sources::WebArchive Sources::AlienVault Sources::IntelligenceX);
+my @sources = qw(Sources::WebArchive Sources::AlienVault Sources::IntelligenceX Sources::CommonCrawl);
 
 sub search_urls
 {
