@@ -1,10 +1,9 @@
 package Sources::WebArchive;
 
-use JSON;
 use strict;
 use warnings;
-use HTTP::Tiny;
 use Sources::Utils;
+use Mojo::UserAgent;
 
 sub new
 {
@@ -23,6 +22,11 @@ sub new
     }, $self;
 }
 
+sub agent {
+    my ($self) = @_;
+    $self->{agent} ||= Mojo::UserAgent->new
+}
+
 sub get_urls
 {
     my ($self, $domain, $limit) = @_;
@@ -33,9 +37,9 @@ sub get_urls
     $api_url .= "&filter=!mimetype:$filters->{exclude_mime}" if $filters->{exclude_mime};
     $api_url .= "&filter=statuscode:$filters->{include_code}" if $filters->{include_code};
     $api_url .= "&filter=!statuscode:$filters->{exclude_code}" if $filters->{exclude_code};
-    my $response = HTTP::Tiny->new()->get($api_url);
-    return {} unless $response->{success};
-    return $self->__filter(decode_json($response->{content}), $limit);
+    my $response = $self->agent->get($api_url)->result;
+    return {} unless $response->is_success;
+    return $self->__filter($response->json, $limit);
 }
 
 sub __filter

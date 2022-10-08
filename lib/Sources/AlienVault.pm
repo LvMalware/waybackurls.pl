@@ -1,10 +1,9 @@
 package Sources::AlienVault;
 
-use JSON;
 use strict;
 use warnings;
-use HTTP::Tiny;
 use Sources::Utils;
+use Mojo::UserAgent;
 
 sub new
 {
@@ -21,6 +20,10 @@ sub new
     }, $self;
 }
 
+sub agent {
+    my ($self) = @_;
+    $self->{agent} ||= Mojo::UserAgent->new
+}
 
 sub get_urls
 {
@@ -35,8 +38,8 @@ sub __pages
     my $page = 0;
     return sub {
         return undef if $page < 0;
-        my $response = HTTP::Tiny->new()->get("$api_url?page=$page");
-        my $json = $response->{success} ? decode_json($response->{content}) : {};
+        my $response = $self->agent->get("$api_url?page=$page")->result;
+        my $json = $response->is_success ? $response->json : {};
         $page = $json->{has_next} ? $page + 1 : -1;
         return (%{$json} + 0) ? $json->{url_list} : undef;
     }

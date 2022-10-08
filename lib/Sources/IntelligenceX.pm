@@ -1,11 +1,10 @@
 package Sources::IntelligenceX;
 
-use JSON;
 use strict;
 use URI::URL;
 use warnings;
-use HTTP::Tiny;
 use Sources::Utils;
+use Mojo::UserAgent;
 
 sub new
 {
@@ -25,14 +24,26 @@ sub new
     }, $self;
 }
 
+sub agent {
+    my ($self) = @_;
+    $self->{agent} ||= Mojo::UserAgent->new
+}
+
 sub get_urls
 {
     my ($self, $domain, $limit) = @_;
     my $api_key = $self->{credentials}->{api_key} || die "Missing API key";
     my $api_url = "https://public.intelx.io/phonebook/search?k=$api_key";
-    my $post_data = qq({"term":"$domain","media":0,"target":3,"terminate":[null],"timeout":20});
-    my $response = HTTP::Tiny->new()->post($api_url, { content => $post_data });
-    my $json = $response->{success} ? decode_json($response->{content}) : {};
+    my $response = $self->agent->post(
+        $api_url, => { } => {
+            term => $domain,
+            media => 0,
+            target => 3,
+            timeout => 20,
+            terminate => [undef],
+        }
+    )->result;
+    my $json = $response->is_success ? $response->json : {};
     my $search_id = $json->{id} || die "Search error";
     my $result_url = "https://public.intelx.io/phonebook/search/result?k=$api_key&id=$search_id";
     my $next = $self->__results($result_url);
@@ -43,8 +54,8 @@ sub __results
 {
     my ($self, $result_url) = @_;
     return sub {
-        my $response = HTTP::Tiny->new()->get($result_url);
-        my $json = $response->{success} ? decode_json($response->{content}) : {};
+        my $response = $self->agent->get($result_url)->result;
+        my $json = $response->is_success ? $response->json : {};
         return @{$json->{selectors}} > 0 ? $json->{selectors} : undef
     }
 }

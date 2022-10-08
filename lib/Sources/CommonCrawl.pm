@@ -1,15 +1,15 @@
 package Sources::CommonCrawl;
 
-use JSON;
 use strict;
 use warnings;
-use HTTP::Tiny;
 use Sources::Utils;
+use Mojo::UserAgent;
+use Mojo::JSON 'decode_json';
 
 sub new {
     my ($self, %args) = @_;
     bless {
-        api_url => "https://index.commoncrawl.org/collinfo.json",
+        api_url => "https://index.commoncrawl.org/CC-MAIN-2022-33-index",
         filters => {
             include_mime => $args{include_mime},
             exclude_mime => $args{exclude_mime},
@@ -22,53 +22,40 @@ sub new {
     }, $self;
 }
 
+sub agent {
+    my ($self) = @_;
+    $self->{agent} ||= Mojo::UserAgent->new
+}
+
 sub get_urls
 {
     my ($self, $domain, $limit) = @_;
-    my $http = HTTP::Tiny->new();
     $domain = "*.$domain" if ($self->{subdomains});
     my $filters = $self->{filters};
-    my $indexes = decode_json($http->get($self->{api_url})->{content});
+    my $indexes = $self->agent->get($self->{api_url})->result->json;
     my $query   = "?url=$domain/*&output=json&collapse=urlkey";
     $query .= "&filter=mimetype:$filters->{include_mime}" if $filters->{include_mime};
     $query .= "&filter=!mimetype:$filters->{exclude_mime}" if $filters->{exclude_mime};
     $query .= "&filter=statuscode:$filters->{include_code}" if $filters->{include_code};
     $query .= "&filter=!statuscode:$filters->{exclude_code}" if $filters->{exclude_code};
-    return $self->__filter($self->__indexes($indexes, $query), $limit);
-}
-
-sub __indexes {
-    my ($self, $list, $query) = @_;
-    my $http = HTTP::Tiny->new();
-    my $index = 0;
-    my $entry = $list->[$index ++];
-    $http->get($entry->{'cdx-api'} . $query)->{content};
+    return $self->__filter($self->agent->get($self->{api_url} . $query)->result->body, $limit)
 }
 
 sub __filter {
-    my ($self, $next, $limit) = @_;
+    my ($self, $body, $limit) = @_;
     my @include = split /,/, $self->{filters}->{include_exts} || "";
     my @exclude = split /,/, $self->{filters}->{exclude_exts} || "";
-    my @keys = qw(key timestamp url mimetype status digest length);
-    my $current = 0;
-    my $crawled = $next;
+    my @jsonobj = split /\n/, $body;
     return sub {
-        return undef unless $crawled;
-        my $end = index($crawled, "\n", $current);
-        while ($end != -1) {
-            my $sub = substr($crawled, $current, $end - $current);
-            $current = $end + 1;
-            $end = index($crawled, "\n", $current);
-            my $cur = eval { decode_json($sub) } || next;
-            my $url = $cur->{url};
-            my $ext = quotemeta(Sources::Utils::get_extension($url));
+        return undef unless @jsonobj > 0;
+        while (@jsonobj > 0) {
+            my $next = shift @jsonobj;
+            my $json = decode_json($next);
+            my $ext = quotemeta(Sources::Utils::get_extension($json->{url}));
             next if grep(/^$ext$/i, @exclude) || (@include > 0 && !grep(/^$ext$/, @include));
-            return $cur
+            return $json
         }
-        if ($end == -1) {
-            $crawled = undef;
-            $current = 0;
-        }
+        return undef;
     }
 }
 
