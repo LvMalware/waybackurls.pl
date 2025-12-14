@@ -103,7 +103,7 @@ NOTES
 }
 
 sub version {
-    print "v0.1.2\n";
+    print "v0.1.3\n";
     exit 0;
 }
 

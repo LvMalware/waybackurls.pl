@@ -5,7 +5,7 @@ This tool is mainly based on [waybackurls](https://github.com/tomnomnom/waybacku
 
 The biggest difference between this tool and the one on which it is based is the ability to filter results based on status code, Mime-Type and file extension, which allows obtaining more relevant results within the context of a specific target.
 
-In the current version, you can query results from the Wayback Machine, AlienVault and IntelligenceX (needs an API key).
+In the current version, you can query results from the Wayback Machine, CommonCrawl, AlienVault, URLScan and IntelligenceX (needs an API key).
 
 ## Usage
 
