@@ -27,8 +27,7 @@ sub agent {
     $self->{agent} ||= Mojo::UserAgent->new
 }
 
-sub get_urls
-{
+sub get_urls {
     my ($self, $domain, $limit) = @_;
     $domain = "*.$domain" if ($self->{subdomains});
     my $filters = $self->{filters};

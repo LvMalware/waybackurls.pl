@@ -5,8 +5,7 @@ use warnings;
 use Sources::Utils;
 use Mojo::UserAgent;
 
-sub new
-{
+sub new {
     my ($self, %args) = @_;
     bless {
         api_url => "https://otx.alienvault.com/api/v1/indicators/",
@@ -25,17 +24,15 @@ sub agent {
     $self->{agent} ||= Mojo::UserAgent->new
 }
 
-sub get_urls
-{
+sub get_urls {
     my ($self, $domain, $limit) = @_;
     my $api_url = $self->{api_url} . ($self->{subdomains} ? "domain" : "hostname");
     return $self->__filter($self->__pages("$api_url/$domain/url_list"), $limit);
 }
 
-sub __pages
-{
+sub __pages {
     my ($self, $api_url) = @_;
-    my $page = 0;
+    my $page = 1;
     return sub {
         return undef if $page < 0;
         my $response = $self->agent->get("$api_url?page=$page")->result;
@@ -45,8 +42,7 @@ sub __pages
     }
 }
 
-sub __filter
-{
+sub __filter {
     my ($self, $page, $limit) = @_;
     my ($current_page, $count) = (undef, 0);
     my ($index, $final) = (1, 0);
@@ -56,10 +52,8 @@ sub __filter
     my @include_exts = split /,/, $filters->{include_exts} || "";
     my @exclude_exts = split /,/, $filters->{exclude_exts} || "";
     return sub {
-        while (!$limit || $count < $limit)
-        {
-            if ($index >= $final)
-            {
+        while (!$limit || $count < $limit) {
+            if ($index >= $final) {
                 $current_page = $page->() || return undef;
                 ($index, $final) = (0, @{$current_page} + 0);
             }

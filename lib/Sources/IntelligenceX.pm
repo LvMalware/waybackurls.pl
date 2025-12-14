@@ -6,11 +6,10 @@ use warnings;
 use Sources::Utils;
 use Mojo::UserAgent;
 
-sub new
-{
+sub new {
     my ($self, %args) = @_;
     bless {
-        api_url => "http://web.archive.org/cdx/search/cdx",
+        api_url => "https://public.intelx.io/phonebook/search",
         filters => {
             include_mime => $args{include_mime},
             exclude_mime => $args{exclude_mime},
@@ -29,13 +28,12 @@ sub agent {
     $self->{agent} ||= Mojo::UserAgent->new
 }
 
-sub get_urls
-{
+sub get_urls {
     my ($self, $domain, $limit) = @_;
     my $api_key = $self->{credentials}->{api_key} || die "Missing API key";
-    my $api_url = "https://public.intelx.io/phonebook/search?k=$api_key";
+    my $api_url = "$self->{api_url}?k=$api_key";
     my $response = $self->agent->post(
-        $api_url, => { } => {
+        $api_url => { } => {
             term => $domain,
             media => 0,
             target => 3,
@@ -50,8 +48,7 @@ sub get_urls
     return $self->__filter($next, $limit, $domain);
 }
 
-sub __results
-{
+sub __results {
     my ($self, $result_url) = @_;
     return sub {
         my $response = $self->agent->get($result_url)->result;
@@ -60,8 +57,7 @@ sub __results
     }
 }
 
-sub __filter
-{
+sub __filter {
     my ($self, $next, $limit, $domain) = @_;
     my ($current, $count) = (undef, 0);
     my ($index, $final) = (1, 0);
@@ -69,10 +65,8 @@ sub __filter
     my @include = split /,/, $filters->{include_exts} || "";
     my @exclude = split /,/, $filters->{exclude_exts} || "";
     return sub {
-        while (!$limit || $count < $limit)
-        {
-            if ($index >= $final)
-            {
+        while (!$limit || $count < $limit) {
+            if ($index >= $final) {
                 $current = $next->() || return undef;
                 ($index, $final) = (0, @{$current} + 0);
             }

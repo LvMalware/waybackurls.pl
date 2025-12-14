@@ -5,7 +5,9 @@ use strict;
 use warnings;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case);
+
 use lib './lib';
+use Sources::URLScan;
 use Sources::WebArchive;
 use Sources::AlienVault;
 use Sources::CommonCrawl;
@@ -13,16 +15,15 @@ use Sources::IntelligenceX;
 
 my ($output, $silent, $json);
 
-my @sources = qw(Sources::WebArchive Sources::AlienVault Sources::IntelligenceX Sources::CommonCrawl);
+my @sources = qw(Sources::URLScan Sources::WebArchive Sources::AlienVault Sources::IntelligenceX Sources::CommonCrawl);
 
-sub search_urls
-{
+sub search_urls {
     my ($domain, $subdomains, $exclude_mime, $include_mime, $exclude_code,
         $include_code, $exclude_exts, $include_exts, $credentials) = @_;
+
     my $count = 0;
-    for my $source (@sources)
-    {
-        my $name = (split /:/, $source)[-1];
+    for my $source (@sources) {
+        my $name = (split "::", $source)[-1];
         print STDERR "[+] Searching with $name ...\n" unless $silent;
         my $searcher = $source->new(
             include_mime => $include_mime,
@@ -36,14 +37,11 @@ sub search_urls
         );
         
         my $next = eval { $searcher->get_urls($domain) };
-        unless (defined($next))
-        {
-            print STDERR "[-] Failed: $@\n" unless $silent;
+        unless (defined($next)) {
+            print STDERR "[-] Failed: $@\n" unless $silent || !$@;
             next
         }
-        while (defined(my $entry = $next->()))
-        {
-            last if $entry == 0;
+        while (defined(my $entry = $next->())) {
             print $output ($json ? encode_json($entry) : $entry->{url} || next), "\n";
             $count ++;
         }
@@ -51,8 +49,7 @@ sub search_urls
     $count;
 }
 
-sub help
-{
+sub help {
     my ($full) = @_;
     
     my $prog = basename($0);
@@ -105,22 +102,19 @@ NOTES
     exit 0;
 }
 
-sub version
-{
+sub version {
     print "v0.1.2\n";
     exit 0;
 }
 
-sub load_credentials
-{
+sub load_credentials {
     my ($file) = @_;
     return {} unless $file;
     open(my $fh, "<$file") || die "$0: Can't open $file for reading: $!";
     decode_json(join '', <$fh>);
 }
 
-sub main
-{
+sub main {
     my (@good_extensions, @bad_extensions, @targets);
     my (@good_types, @bad_types, @good_status, @bad_status);
     my ($subdomains, $infile, $outfile, $images) = (1, "", "", 0);
@@ -149,21 +143,16 @@ sub main
 
     push @targets, @ARGV if @ARGV;
 
-    if ($infile)
-    {
+    if ($infile) {
         my $input;
-        if ($infile eq "-")
-        {
+        if ($infile eq "-") {
             open($input, "<&=STDIN");
-        }
-        else
-        {
+        } else {
             open($input, "<$infile") ||
                 die "$0: Can't open $infile: $!";
         }
 
-        until (eof($input))
-        {
+        until (eof($input)) {
             chomp(my $domain = <$input>);
             push @targets, $domain if $domain;
         }
@@ -173,8 +162,7 @@ sub main
     
     open($output, ">&STDOUT");
     
-    if ($outfile && $outfile ne "-")
-    {
+    if ($outfile && $outfile ne "-") {
         open($output, ">$outfile") || die "$0: Can't open $outfile: $!";
     }
 
@@ -186,8 +174,7 @@ sub main
     my $include_code = join '|', map { $_ =~ s/,/\|/gr } @good_status;
 
     $exclude_exts .= "," . $img_extensions unless $images;
-    for my $domain (@targets)
-    {
+    for my $domain (@targets) {
         print STDERR "[+] Searching urls for $domain ...\n" unless $silent;
         my $total = search_urls(
             $domain, $subdomains, $exclude_mime,
