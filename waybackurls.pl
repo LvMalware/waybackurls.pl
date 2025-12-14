@@ -81,7 +81,7 @@ Options:
 
 HELP
 
-    exit unless $full;
+    exit 0 unless $full;
     
     print <<NOTES;
 
@@ -94,10 +94,9 @@ Examples:
 
 Author:
 
-    Lucas V. Araujo <lucas.vieira.ar\@disroot.org>
+    Lucas V. Araujo <root\@lva.sh>
     GitHub: https://github.com/LvMalware/waybackurls.pl
     
-    This tool is based on https://github.com/original
 NOTES
     exit 0;
 }
