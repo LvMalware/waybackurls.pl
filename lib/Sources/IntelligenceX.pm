@@ -25,7 +25,9 @@ sub new {
 
 sub agent {
     my ($self) = @_;
-    $self->{agent} ||= Mojo::UserAgent->new
+    $self->{agent} ||= Mojo::UserAgent->new(inactivity_timeout => 0);
+    $self->{agent}->transactor->name(Sources::Utils::random_useragent);
+    $self->{agent}
 }
 
 sub get_urls {

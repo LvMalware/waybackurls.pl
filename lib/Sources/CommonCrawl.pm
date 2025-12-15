@@ -24,7 +24,9 @@ sub new {
 
 sub agent {
     my ($self) = @_;
-    $self->{agent} ||= Mojo::UserAgent->new
+    $self->{agent} ||= Mojo::UserAgent->new(inactivity_timeout => 0);
+    $self->{agent}->transactor->name(Sources::Utils::random_useragent);
+    $self->{agent}
 }
 
 sub get_urls {
@@ -46,10 +48,10 @@ sub __filter {
     my @exclude = split /,/, $self->{filters}->{exclude_exts} || "";
     my @jsonobj = split /\n/, $body;
     return sub {
-        return undef unless @jsonobj > 0;
         while (@jsonobj > 0) {
             my $next = shift @jsonobj;
             my $json = decode_json($next);
+            next unless $json->{url};
             my $ext = quotemeta(Sources::Utils::get_extension($json->{url}));
             next if grep(/^$ext$/i, @exclude) || (@include > 0 && !grep(/^$ext$/, @include));
             return $json
